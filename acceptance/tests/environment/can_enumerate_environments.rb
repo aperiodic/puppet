@@ -6,7 +6,7 @@ end
 
 with_puppet_running_on(master, {}) do
   agents.each do |agent|
-    on agent, "curl -ksv https://#{master}:#{master_port(agent)}/v2/environments", :acceptable_exit_codes => [0,7] do
+    on agent, "curl -ksv https://#{master}:#{master_port(agent)}/v2.0/environments", :acceptable_exit_codes => [0,7] do
       assert_match(/< HTTP\/1\.\d 403/, stderr)
     end
   end
