@@ -9,8 +9,8 @@ class Puppet::Module
 
     FORBIDDEN_EXTENSIONS = %w{.conf .md}
 
-    def self.is_task_name?(name)
-      return true if name =~ /^[a-z][a-z0-9_]*$/
+    def self.is_task_name?(task_name)
+      return true if task_name =~ /^[a-z][a-z0-9_]*$/
       return false
     end
 
@@ -53,7 +53,7 @@ class Puppet::Module
         end
       end
 
-      name = task_name == "init" ? pup_module.name : "#{pup_module.name}::#{task_name}"
+      name = (task_name == "init") ? pup_module.name : "#{pup_module.name}::#{task_name}"
 
       @module = pup_module
       @name = name
@@ -68,13 +68,13 @@ class Puppet::Module
 
     private
 
-    def self.new_with_files(pup_module, name, tasks_files)
+    def self.new_with_files(pup_module, task_name, tasks_files)
       files = tasks_files.map do |filename|
         File.join(pup_module.tasks_directory, File.basename(filename))
       end
 
       metadata_files, exe_files = files.partition { |f| is_tasks_metadata_filename?(f) }
-      Puppet::Module::Task.new(pup_module, name, exe_files, metadata_files.first)
+      Puppet::Module::Task.new(pup_module, task_name, exe_files, metadata_files.first)
     end
 
     def self.task_name_from_path(path)
