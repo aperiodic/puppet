@@ -9,8 +9,8 @@ class Puppet::Module
 
     FORBIDDEN_EXTENSIONS = %w{.conf .md}
 
-    def self.is_task_name?(name)
-      return true if name =~ /^[a-z][a-z0-9_]*$/
+    def self.is_task_name?(task_name)
+      return true if task_name =~ /^[a-z][a-z0-9_]*$/
       return false
     end
 
@@ -53,7 +53,7 @@ class Puppet::Module
         end
       end
 
-      name = task_name == "init" ? pup_module.name : "#{pup_module.name}::#{task_name}"
+      name = (task_name == "init") ? pup_module.name : "#{pup_module.name}::#{task_name}"
 
       @module = pup_module
       @name = name
