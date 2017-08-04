@@ -7,9 +7,10 @@ require 'puppet/module/task'
 describe Puppet::Module::Task do
   include PuppetSpec::Files
 
+  let(:env) { mock("environment") }
   let(:modpath) { tmpdir('task_modpath') }
   let(:mymodpath) { File.join(modpath, 'mymod') }
-  let(:mymod) { Puppet::Module.new('mymod', mymodpath, nil) }
+  let(:mymod) { Puppet::Module.new('mymod', mymodpath, env) }
   let(:tasks_path) { File.join(mymodpath, 'tasks') }
   let(:tasks_glob) { File.join(mymodpath, 'tasks', '*') }
 
@@ -89,5 +90,76 @@ describe Puppet::Module::Task do
 
   it "gives the 'init' task a name that is just the module's name" do
     expect(Puppet::Module::Task.new(mymod, 'init', ["#{tasks_path}/init.sh"]).name).to eq('mymod')
+  end
+end
+
+describe Puppet::Module::Task do
+  include PuppetSpec::Files
+
+  let(:env) { mock("environment") }
+  let(:modpath) { tmpdir('task_modpath') }
+  let(:mymodpath) { File.join(modpath, 'mymod') }
+  let!(:mymod) { PuppetSpec::Modules.create('mymod', mymodpath, :environment => env) }
+  let(:mytaskpath) { mymod.tasks_directory }
+  let(:mytaskjson) { File.join(mymod.tasks_directory, 'mytask.json') }
+
+  it "returns the expected utf-8 data when the JSON metadata file exists and is well-formed and " do
+    rune_utf8 = "\u16A0\u16C7\u16BB" # ᚠᛇᚻ
+    description = "Perform routine maintenance on your Viking longships, by #{rune_utf8}"
+    json_metadata = <<-EOF
+    {
+      "description": "#{description}",
+      "supportsNoop": true
+    }
+    EOF
+    File.expects(:read).with(mytaskjson, {encoding: 'utf-8'}).returns(json_metadata)
+
+    mytask = Puppet::Module::Task.new(mymod, 'mytask', [], mytaskjson)
+    expect(mytask.metadata).to eq({'description' => description, 'supportsNoop' => true})
+  end
+
+  it "returns an empty map for the metadata when there is no metadata file" do
+    mytask = Puppet::Module::Task.new(mymod, 'mytask', [], nil)
+    expect(mytask.metadata).to eq({})
+  end
+
+  it "returns an empty map for the metadata when the file cannot be read" do
+    File.expects(:read).with(mytaskjson, {encoding: 'utf-8'}).raises(Errno::ENOENT)
+
+    mytask = Puppet::Module::Task.new(mymod, 'mytask', [], mytaskjson)
+    expect(mytask.metadata).to eq({})
+  end
+
+  describe "when the JSON metadata file is malformed" do
+    it "returns the empty map if --strict is not error" do
+      Puppet[:strict] = :warning
+      Puppet.expects(:warning)
+      File.expects(:read).with(mytaskjson, {encoding: 'utf-8'}).returns('{ "leave u hanging"')
+
+      mytask = Puppet::Module::Task.new(mymod, 'mytask', [], mytaskjson)
+      expect(mytask.metadata).to eq({})
+    end
+
+    it "throws an error if --strict is error" do
+      Puppet[:strict] = :error
+      File.expects(:read).with(mytaskjson, {encoding: 'utf-8'}).returns('{ "leave u hanging"')
+      mytask = Puppet::Module::Task.new(mymod, 'mytask', [], mytaskjson)
+      expect { mytask.metadata }.to raise_error(Puppet::Module::FaultyMetadata)
+    end
+  end
+
+  it "does not read the metadata file when the task is created" do
+    Puppet::Module::Task.any_instance.expects(:read_metadata).never
+    File.expects(:read).with(mytaskjson, {encoding: 'utf-8'}).never
+
+    mytask = Puppet::Module::Task.new(mymod, 'mytask', [], mytaskjson)
+  end
+
+  it "only reads the metadata file once" do
+    File.expects(:read).with(mytaskjson, {encoding: 'utf-8'}).once.returns('{}')
+
+    mytask = Puppet::Module::Task.new(mymod, 'mytask', [], mytaskjson)
+    mytask.metadata
+    mytask.metadata
   end
 end

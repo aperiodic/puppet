@@ -66,6 +66,30 @@ class Puppet::Module
       self.module == other.module
     end
 
+    def read_metadata
+      return {} unless instance_variable_defined?(:@metadata_file)
+      return JSON.parse(File.read(@metadata_file, :encoding => 'utf-8'))
+    rescue Errno::ENOENT
+      {}
+    rescue JSON::JSONError => e
+      msg = _("%{task_name} has a malformed metadata.json file. The parse error: %{error_message}") % {task_name: name, error_message: e.message}
+      case Puppet[:strict]
+      when :off
+        Puppet.debug(msg)
+      when :warning
+        Puppet.warning(msg)
+      when :error
+        raise FaultyMetadata, msg
+      end
+      {}
+    end
+
+    def metadata
+      return @metadata if instance_variable_defined?(:@metadata)
+
+      @metadata = read_metadata
+    end
+
     private
 
     def self.new_with_files(pup_module, task_name, tasks_files)
